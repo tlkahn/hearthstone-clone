@@ -4,7 +4,7 @@ class_name BoardMinion
 signal minion_clicked(entity_id: int)
 
 @onready var name_label: Label = $VBox/NameLabel
-@onready var stats_label: Label = $VBox/StatsLabel
+@onready var stats_label: RichTextLabel = $VBox/StatsLabel
 @onready var keywords_label: Label = $VBox/KeywordsLabel
 @onready var sickness_overlay: ColorRect = $SicknessOverlay
 @onready var taunt_border: Panel = $TauntBorder
@@ -26,9 +26,9 @@ func set_minion_data(data: Dictionary) -> void:
 	var hp: int = data.get("health", 0)
 	var max_hp: int = data.get("max_health", hp)
 	if hp < max_hp:
-		stats_label.text = "%d / [color=red]%d[/color]" % [atk, hp]
+		stats_label.text = "[center]%d / [color=red]%d[/color][/center]" % [atk, hp]
 	else:
-		stats_label.text = "%d / %d" % [atk, hp]
+		stats_label.text = "[center]%d / %d[/center]" % [atk, hp]
 
 	var kws = data.get("keywords", [])
 	var kw_parts: PackedStringArray = []

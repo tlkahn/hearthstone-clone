@@ -223,7 +223,7 @@ BoardScene (Control)
 |-------|--------|------|---------|
 | `hero_panel.tscn` | `hero_panel.gd` | 200×80 | HP/Armor/Weapon display, click signal |
 | `board_minion.tscn` | `board_minion.gd` | 90×110 | Name, attack/health, keywords, taunt border, sickness overlay |
-| `hand_card.tscn` | `hand_card.gd` | 140×196 | Embeds `card_display.tscn` at 70% scale, unplayable overlay, hover-to-enlarge |
+| `hand_card.tscn` | `hand_card.gd` | 140×196 | Embeds `card_display.tscn` (full-rect, no scale), unplayable overlay, hover-to-enlarge |
 | `face_down_card.tscn` | `face_down_card.gd` | 60×84 | Blue card back, no interactivity |
 
 Each sub-scene emits a click signal (`hero_clicked`, `minion_clicked`, `hand_card_clicked`) that the board scene's state machine handles.
@@ -252,7 +252,7 @@ New Godot scenes:
 | `godot/scenes/board/board_scene.tscn` | Main board layout — all areas composed |
 | `godot/scenes/board/hero_panel.tscn` | Hero HP/armor/weapon panel |
 | `godot/scenes/board/board_minion.tscn` | Board minion display |
-| `godot/scenes/board/hand_card.tscn` | Hand card (wraps card_display at 70%) |
+| `godot/scenes/board/hand_card.tscn` | Hand card (wraps card_display, full-rect fill) |
 | `godot/scenes/board/face_down_card.tscn` | Opponent card back |
 
 New GDScript files:
@@ -269,27 +269,44 @@ Modified config:
 
 | File | Changes |
 |------|---------|
-| `godot/project.godot` | Added `GameBridge` autoload, changed main scene to `board_scene.tscn` |
+| `godot/project.godot` | Added `Game` autoload (for `GameBridge` class), changed main scene to `board_scene.tscn` |
+| `data/cards/basic_minions.ron` | Added Wisp (0 mana), River Crocolisk (2 mana), Chillwind Yeti (4 mana) |
+| `crates/rules/src/card_loader.rs` | Updated integration test card count (5 → 8) |
 
 ## Test Deck
 
-Only 5 card definitions exist in `data/cards/`. The test deck uses repeated IDs to reach 30 cards:
+8 card definitions exist in `data/cards/` (6 minions + 1 spell + 1 token). The test deck uses a proper mana curve:
 
 ```gdscript
-# 10× Boulderfist Ogre (6 mana, 6/7)
-# 10× Sen'jin Shieldmasta (4 mana, 3/5, Taunt)
-# 10× Fireball (4 mana, deal 6 damage — targeted spell)
+# 4× Wisp (0 mana, 1/1)               — playable turn 1
+# 6× River Crocolisk (2 mana, 2/3)     — playable turn 2
+# 6× Chillwind Yeti (4 mana, 4/5)      — playable turn 4
+# 4× Sen'jin Shieldmasta (4 mana, 3/5) — Taunt
+# 4× Boulderfist Ogre (6 mana, 6/7)    — late game
+# 6× Fireball (4 mana, deal 6 damage)  — targeted spell
 ```
 
-This exercises minion play, combat, taunt, targeted spells, and mana management.
+This exercises minion play from turn 1, combat, taunt, targeted spells, and mana management.
 
 ## Gotchas
+
+> [!note] Autoload name must differ from class name
+> The gdext `GameBridge` Rust class is registered as both a GDScript class *and* an autoload. If the autoload name matches the class name, GDScript resolves the identifier as the class type (not the singleton instance), producing `Cannot call non-static function on the class directly`. The fix: autoload is named `Game` while the class remains `GameBridge` — matching the existing `CardDatabase` (class) / `CardDB` (autoload) pattern.
 
 > [!note] EntityId u64 ↔ i64 casting
 > `u64::MAX` (P1 hero sentinel) becomes `-1` as `i64`. The bridge casts consistently via `entity_id_to_i64` / `i64_to_entity_id`. GDScript always uses `-1` for P1's hero.
 
 > [!note] CardRegistry sharing
 > `GameBridge` loads its own `CardRegistry` on `start_game()` (same path logic as `CardDatabase`). Simple, no coupling between the two autoloads.
+
+> [!note] Hand card mouse passthrough
+> The embedded `card_display.tscn` instance and its children (TextureRect, RichTextLabel) default to `mouse_filter = STOP`, which consumes click events before the parent `HandCard` sees them. Fix: set `mouse_filter = IGNORE` on the CardDisplay node in the tscn, and recursively disable mouse on all its descendants in `hand_card.gd:_ready()`.
+
+> [!note] Hand card scaling vs. fill
+> Applying `scale = Vector2(0.7, 0.7)` to CardDisplay inside a PanelContainer (which already resizes the child via anchors) causes double-shrinking — the control is resized to 140×196 *then* scaled to 98×137, making text unreadable. The fix: use Full Rect anchors (no scale) so CardDisplay fills the 140×196 PanelContainer directly. Internal labels at y>196 (attack/health icons) clip, but those stats appear on `BoardMinion` instead.
+
+> [!note] BBCode requires RichTextLabel, not Label
+> `BoardMinion`'s stats label uses BBCode (`[color=red]`) to show damaged health in red. A plain `Label` renders BBCode tags as literal text (e.g., `2 / [color=red]2[/color]`). The fix: use `RichTextLabel` with `bbcode_enabled = true` and `fit_content = true`. For centering, wrap text in `[center]...[/center]` tags since RichTextLabel doesn't have `horizontal_alignment`. Also set `mouse_filter = 2` and `scroll_active = false` to prevent the label from capturing input or showing scrollbars.
 
 > [!note] Board position
 > Cards are always appended to the end of the board (`position = board.size()`). A future polish pass could add gap-click position selection between existing minions.

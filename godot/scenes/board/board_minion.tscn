@@ -22,9 +22,12 @@ text = "Minion"
 horizontal_alignment = 1
 text_overrun_behavior = 3
 
-[node name="StatsLabel" type="Label" parent="VBox"]
+[node name="StatsLabel" type="RichTextLabel" parent="VBox"]
+bbcode_enabled = true
 text = "0 / 0"
-horizontal_alignment = 1
+fit_content = true
+scroll_active = false
+mouse_filter = 2
 
 [node name="KeywordsLabel" type="Label" parent="VBox"]
 custom_minimum_size = Vector2(0, 20)
