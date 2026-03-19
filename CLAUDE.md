@@ -38,13 +38,16 @@ hearthstone-clone/
 │   └── gdext-bridge/           # hs-gdext-bridge crate — GodotClasses
 │       └── src/
 │           ├── card_bridge.rs  # CardDatabase (autoload as CardDB)
+│           ├── game_bridge.rs  # GameBridge (autoload — game actions/state)
 │           └── lib.rs          # GDExtension entry point
 ├── data/cards/                 # Card definitions in RON format
 ├── godot/                      # Godot project root (res:// resolves here)
 │   ├── project.godot
 │   ├── hearthstone.gdextension
 │   ├── scenes/card/            # Card display and test scenes
+│   ├── scenes/board/           # Board UI scenes (board_scene, hero_panel, etc.)
 │   ├── scripts/card/           # card_display.gd, card_test.gd
+│   ├── scripts/board/          # board_scene.gd, hero_panel.gd, etc.
 │   └── assets/art/             # Placeholder frames and card art
 └── doc/
     ├── metaplan.md             # High-level plan — 7 major systems
@@ -55,11 +58,11 @@ hearthstone-clone/
 
 ```bash
 cargo build                     # Build all crates
-cargo test -p hs-rules          # Run 76 unit/integration tests
+cargo test -p hs-rules          # Run 87 unit/integration tests
 cargo build -p hs-gdext-bridge  # Build the Godot extension dylib
 ```
 
-Open `godot/project.godot` in Godot to run the game. Main test scene: `scenes/card/card_test.tscn`.
+Open `godot/project.godot` in Godot to run the game. Main scene: `scenes/board/board_scene.tscn`. Card test scene: `scenes/card/card_test.tscn`.
 
 ## System Status
 
@@ -67,7 +70,7 @@ Open `godot/project.godot` in Godot to run the game. Main test scene: `scenes/ca
 |---|--------|--------|-----------|
 | 1 | Card Data Pipeline | **Done** | `crates/rules/src/card.rs`, `card_loader.rs`, `gdext-bridge/src/card_bridge.rs` |
 | 2 | Game Rules Engine | **Done** | `crates/rules/src/engine.rs`, `effect.rs`, `effect_exec.rs`, `game_state.rs`, `entity.rs` |
-| 3 | Board UI & Interaction | Not started | `godot/scenes/board/`, `godot/scripts/board/` |
+| 3 | Board UI & Interaction | **Done** | `gdext-bridge/src/game_bridge.rs`, `godot/scenes/board/`, `godot/scripts/board/` |
 | 4 | Animations & VFX | Not started | `godot/scenes/vfx/`, `godot/scripts/vfx/` |
 | 5 | Networking | Not started | `crates/network/`, `crates/server/` |
 | 6 | Backend Services | Not started | `crates/server/` |

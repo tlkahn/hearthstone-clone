@@ -573,6 +573,113 @@ impl GameEngine {
 
     /// Sentinel EntityId used to represent the opponent's hero as an attack target.
     pub const HERO_ENTITY_ID: EntityId = 0;
+
+    // --- Query methods for the bridge (Phase 1a) ---
+
+    /// Check whether an entity can attack this turn. Returns Ok(()) or the specific error.
+    pub fn can_entity_attack(&self, player: PlayerId, entity_id: EntityId) -> Result<(), GameError> {
+        if !self.state.players[player].board.contains(&entity_id) {
+            return Err(GameError::InvalidAttacker(entity_id));
+        }
+        let entity = self
+            .state
+            .entities
+            .get(&entity_id)
+            .ok_or(GameError::InvalidAttacker(entity_id))?;
+        let minion = entity
+            .as_minion()
+            .ok_or(GameError::InvalidAttacker(entity_id))?;
+
+        if minion.summoning_sickness
+            && !minion.keywords.contains(&crate::card::Keyword::Charge)
+        {
+            return Err(GameError::SummoningSickness);
+        }
+        if minion.attacks_this_turn >= 1 {
+            return Err(GameError::AlreadyAttacked);
+        }
+        Ok(())
+    }
+
+    /// Returns all valid attack targets for a given attacker (opponent minions + hero,
+    /// filtered by taunt).
+    pub fn valid_attack_targets(
+        &self,
+        player: PlayerId,
+        _attacker_id: EntityId,
+    ) -> Vec<EntityId> {
+        let opp = self.state.opponent(player);
+
+        let taunt_minions: Vec<EntityId> = self.state.players[opp]
+            .board
+            .iter()
+            .filter(|&&eid| {
+                self.state
+                    .entities
+                    .get(&eid)
+                    .and_then(|e| e.as_minion())
+                    .map_or(false, |m| {
+                        m.keywords.contains(&crate::card::Keyword::Taunt)
+                    })
+            })
+            .copied()
+            .collect();
+
+        if !taunt_minions.is_empty() {
+            return taunt_minions;
+        }
+
+        // No taunt — all opponent minions + opponent hero
+        let mut targets: Vec<EntityId> = self.state.players[opp].board.clone();
+        targets.push(Self::hero_entity_id(opp));
+        targets
+    }
+
+    /// Check if a card at `hand_index` is playable (enough mana, board not full for minions).
+    pub fn is_card_playable(&self, player: PlayerId, hand_index: usize) -> bool {
+        let hand = &self.state.players[player].hand;
+        if hand_index >= hand.len() {
+            return false;
+        }
+        let eid = hand[hand_index];
+        let entity = match self.state.entities.get(&eid) {
+            Some(e) => e,
+            None => return false,
+        };
+        let card_def = match self.registry.get(&entity.card_id) {
+            Some(c) => c,
+            None => return false,
+        };
+        if card_def.mana_cost > self.state.players[player].mana {
+            return false;
+        }
+        if matches!(card_def.card_type, CardTypeData::Minion(_))
+            && self.state.players[player].board.len() >= MAX_BOARD_SIZE
+        {
+            return false;
+        }
+        true
+    }
+
+    /// For a card at `hand_index`, returns Some(targets) if it needs a target, None otherwise.
+    pub fn valid_play_targets_for_hand(
+        &self,
+        player: PlayerId,
+        hand_index: usize,
+    ) -> Option<Vec<EntityId>> {
+        let hand = &self.state.players[player].hand;
+        if hand_index >= hand.len() {
+            return None;
+        }
+        let eid = hand[hand_index];
+        let entity = self.state.entities.get(&eid)?;
+        let card_def = self.registry.get(&entity.card_id)?;
+        if Self::any_effect_requires_target(&card_def.effects) {
+            self.valid_targets(&card_def.effects, player)
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]

@@ -15,9 +15,10 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="Hearthstone Clone"
-run/main_scene="res://scenes/card/card_test.tscn"
+run/main_scene="res://scenes/board/board_scene.tscn"
 config/features=PackedStringArray("4.6")
 
 [autoload]
 
 CardDB="*res://scenes/card/card_database.tscn"
+Game="*res://scenes/board/game_bridge.tscn"

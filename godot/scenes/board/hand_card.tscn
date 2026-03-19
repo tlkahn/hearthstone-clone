@@ -1,0 +1,29 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/board/hand_card.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/card/card_display.tscn" id="2"]
+
+[node name="HandCard" type="PanelContainer"]
+custom_minimum_size = Vector2(140, 196)
+script = ExtResource("1")
+mouse_filter = 1
+
+[node name="CardDisplay" parent="." instance=ExtResource("2")]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="UnplayableOverlay" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.0, 0.0, 0.0, 0.4)
+
+[connection signal="mouse_entered" from="." to="." method="_on_mouse_entered"]
+[connection signal="mouse_exited" from="." to="." method="_on_mouse_exited"]

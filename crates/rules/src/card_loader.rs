@@ -285,8 +285,8 @@ mod tests {
             .join("cards");
         let registry = super::CardRegistry::load_from_directory(&data_dir).unwrap();
 
-        // We have 3 minions + 1 spell + 1 token = 5 cards
-        assert_eq!(registry.count(), 5);
+        // We have 6 minions + 1 spell + 1 token = 8 cards
+        assert_eq!(registry.count(), 8);
 
         // Spot-check specific cards
         let ogre = registry.get("basic_boulderfist_ogre").unwrap();

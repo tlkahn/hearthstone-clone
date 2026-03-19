@@ -9,3 +9,4 @@ crate-type = ["cdylib"]
 [dependencies]
 godot = "0.4"
 hs-rules = { path = "../rules" }
+rand = "0.8"
