@@ -5,6 +5,7 @@ const BoardMinionScene = preload("res://scenes/board/board_minion.tscn")
 const HandCardScene = preload("res://scenes/board/hand_card.tscn")
 const FaceDownCardScene = preload("res://scenes/board/face_down_card.tscn")
 const ExplosionTexture = preload("res://assets/vfx/explosion_spritesheet.png")
+const SlashTexture = preload("res://assets/vfx/slash_spritesheet.png")
 
 var _board: Control
 var _anim_layer: CanvasLayer
@@ -125,11 +126,13 @@ func _anim_attack(event: Dictionary) -> void:
 		return
 
 	var start = attacker.position
-	var delta = (_center_of(defender) - _center_of(attacker)) * 0.7
+	var direction = _center_of(defender) - _center_of(attacker)
+	var delta = direction * 0.7
 
 	attacker.z_index = 20
 	var tw = _board.create_tween()
 	tw.tween_property(attacker, "position", start + delta, _dur(0.2))
+	tw.tween_callback(_create_slash_effect.bind(_center_of(defender), direction.angle()))
 	tw.tween_property(attacker, "position", start, _dur(0.2))
 	await tw.finished
 	attacker.z_index = 0
@@ -391,6 +394,23 @@ func _spawn_fire_particle(pos: Vector2) -> void:
 	tw.tween_property(particle, "scale", Vector2(0.3, 0.3), 0.3)
 	tw.set_parallel(false)
 	tw.tween_callback(particle.queue_free)
+
+
+func _create_slash_effect(pos: Vector2, angle: float) -> void:
+	var sprite = Sprite2D.new()
+	sprite.texture = SlashTexture
+	sprite.hframes = 6
+	sprite.vframes = 1
+	sprite.frame = 0
+	sprite.position = pos
+	sprite.rotation = angle
+	sprite.scale = Vector2(1.5, 1.5)
+	sprite.z_index = 55
+	_anim_layer.add_child(sprite)
+
+	var tw = _board.create_tween()
+	tw.tween_property(sprite, "frame", 5, _dur(0.3)).from(0)
+	tw.tween_callback(sprite.queue_free)
 
 
 func _create_explosion(pos: Vector2) -> void:
