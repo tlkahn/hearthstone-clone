@@ -1,0 +1,37 @@
+// Basic set — Minions
+CardSet(
+    name: "Basic Minions",
+    cards: [
+        CardDef(
+            id: "basic_boulderfist_ogre",
+            name: "Boulderfist Ogre",
+            mana_cost: 6,
+            card_type: Minion(MinionStats(attack: 6, health: 7)),
+            rarity: Free,
+            keywords: [],
+            text: "",
+            art: "boulderfist_ogre.png",
+        ),
+        CardDef(
+            id: "basic_senjin_shieldmasta",
+            name: "Sen'jin Shieldmasta",
+            mana_cost: 4,
+            card_type: Minion(MinionStats(attack: 3, health: 5)),
+            rarity: Free,
+            keywords: [Taunt],
+            text: "Taunt",
+            art: "senjin_shieldmasta.png",
+        ),
+        CardDef(
+            id: "basic_leeroy_jenkins",
+            name: "Leeroy Jenkins",
+            mana_cost: 5,
+            card_type: Minion(MinionStats(attack: 6, health: 2)),
+            rarity: Legendary,
+            keywords: [Charge, Battlecry],
+            text: "Charge. Battlecry: Summon two 1/1 Whelps for your opponent.",
+            art: "leeroy_jenkins.png",
+            effects: [EffectTag("summon_whelps_for_opponent")],
+        ),
+    ],
+)

@@ -1,0 +1,17 @@
+// Basic set — Spells
+CardSet(
+    name: "Basic Spells",
+    cards: [
+        CardDef(
+            id: "basic_fireball",
+            name: "Fireball",
+            mana_cost: 4,
+            card_type: Spell,
+            rarity: Free,
+            keywords: [],
+            text: "Deal 6 damage.",
+            art: "fireball.png",
+            effects: [EffectTag("deal_damage_6")],
+        ),
+    ],
+)
