@@ -4,6 +4,7 @@ const FloatingTextScene = preload("res://scenes/board/floating_text.tscn")
 const BoardMinionScene = preload("res://scenes/board/board_minion.tscn")
 const HandCardScene = preload("res://scenes/board/hand_card.tscn")
 const FaceDownCardScene = preload("res://scenes/board/face_down_card.tscn")
+const ExplosionTexture = preload("res://assets/vfx/explosion_spritesheet.png")
 
 var _board: Control
 var _anim_layer: CanvasLayer
@@ -393,65 +394,19 @@ func _spawn_fire_particle(pos: Vector2) -> void:
 
 
 func _create_explosion(pos: Vector2) -> void:
-	# Outer ring — expanding orange circle
-	var outer = Panel.new()
-	outer.size = Vector2(80, 80)
-	outer.pivot_offset = Vector2(40, 40)
-	outer.position = pos - Vector2(40, 40)
-	outer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var outer_style = StyleBoxFlat.new()
-	outer_style.bg_color = Color(1.0, 0.4, 0.0, 0.6)
-	outer_style.set_corner_radius_all(40)
-	outer.add_theme_stylebox_override("panel", outer_style)
-	_anim_layer.add_child(outer)
-	outer.scale = Vector2(0.3, 0.3)
+	var sprite = Sprite2D.new()
+	sprite.texture = ExplosionTexture
+	sprite.hframes = 4
+	sprite.vframes = 4
+	sprite.frame = 0
+	sprite.position = pos
+	sprite.scale = Vector2(4.0, 4.0)
+	sprite.z_index = 60
+	_anim_layer.add_child(sprite)
 
-	var tw1 = _board.create_tween()
-	tw1.set_parallel(true)
-	tw1.tween_property(outer, "scale", Vector2(2.0, 2.0), 0.35)
-	tw1.tween_property(outer, "modulate:a", 0.0, 0.35)
-	tw1.set_parallel(false)
-	tw1.tween_callback(outer.queue_free)
-
-	# Inner flash — bright yellow core
-	var inner = Panel.new()
-	inner.size = Vector2(40, 40)
-	inner.pivot_offset = Vector2(20, 20)
-	inner.position = pos - Vector2(20, 20)
-	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var inner_style = StyleBoxFlat.new()
-	inner_style.bg_color = Color(1.0, 0.9, 0.3, 0.9)
-	inner_style.set_corner_radius_all(20)
-	inner.add_theme_stylebox_override("panel", inner_style)
-	_anim_layer.add_child(inner)
-	inner.scale = Vector2(0.5, 0.5)
-
-	var tw2 = _board.create_tween()
-	tw2.set_parallel(true)
-	tw2.tween_property(inner, "scale", Vector2(1.5, 1.5), 0.2)
-	tw2.tween_property(inner, "modulate:a", 0.0, 0.2)
-	tw2.set_parallel(false)
-	tw2.tween_callback(inner.queue_free)
-
-	# Scatter ember particles outward
-	for i in range(8):
-		var angle = randf() * TAU
-		var ember = ColorRect.new()
-		var esize = randf_range(4, 8)
-		ember.size = Vector2(esize, esize)
-		ember.color = Color(1.0, randf_range(0.3, 0.6), 0.0, 0.9)
-		ember.position = pos - ember.size * 0.5
-		ember.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_anim_layer.add_child(ember)
-
-		var dist = randf_range(30, 70)
-		var ember_target = pos + Vector2(cos(angle), sin(angle)) * dist - ember.size * 0.5
-		var tw3 = _board.create_tween()
-		tw3.set_parallel(true)
-		tw3.tween_property(ember, "position", ember_target, 0.3)
-		tw3.tween_property(ember, "modulate:a", 0.0, 0.3)
-		tw3.set_parallel(false)
-		tw3.tween_callback(ember.queue_free)
+	var tw = _board.create_tween()
+	tw.tween_property(sprite, "frame", 15, _dur(0.5)).from(0)
+	tw.tween_callback(sprite.queue_free)
 
 
 func _anim_card_burned(event: Dictionary, pap: int) -> void:

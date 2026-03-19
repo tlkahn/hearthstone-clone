@@ -218,6 +218,78 @@ BoardScene (Control)
 > [!note] create_tween() from RefCounted
 > `AnimationController` is not a `Node` and cannot call `create_tween()` directly. All tweens are created via `_board.create_tween()`, binding them to the board scene node. If the board scene is freed, all tweens are automatically cancelled.
 
+## Upgrading to Production-Quality VFX
+
+### Current State vs Hearthstone-Quality
+
+The current implementation uses programmatically-created `Panel`/`ColorRect` nodes with `StyleBoxFlat` — essentially colored rectangles and circles. This produces functional but "comic-like" visuals. Real Hearthstone VFX use textured particle systems, bloom/glow post-processing, artist-painted sprite sheets, and custom shaders for distortion and light emission.
+
+This is **not a Godot limitation**. Godot's 2D renderer is fully capable of matching Hearthstone's visual quality. The gap is art assets and VFX artist time, not engine capability.
+
+### Godot's VFX Toolbox
+
+| Tool | Use Case |
+|------|----------|
+| `GPUParticles2D` | GPU-accelerated particles with textures, sub-emitters, trails, turbulence |
+| `CanvasItem shaders` | Glow, distortion, dissolve, color ramp (GLSL-like language) |
+| `Light2D` / `PointLight2D` | Dynamic 2D lighting (e.g., fire glow on nearby cards) |
+| `WorldEnvironment` + glow | Bloom post-processing |
+| `AnimatedSprite2D` | Frame-by-frame VFX from sprite sheets |
+| `BackBufferCopy` + shaders | Screen-space distortion (heat haze) |
+
+A production fireball would replace the current `Panel.new()` rects with something like:
+
+```
+GPUParticles2D (fire trail — 30 particles, additive blend, fire texture)
+├── sub-emitter: smoke particles (soft gray, alpha fade)
+├── sub-emitter: spark particles (small bright dots)
+GPUParticles2D (explosion — one-shot burst, radial, flame texture)
+PointLight2D (orange glow that illuminates nearby board)
+Sprite2D + shader (heat distortion on background)
+```
+
+Each particle system needs a hand-painted or photographed fire texture, not a solid-color rectangle. That's where the visual quality comes from.
+
+### Sourcing VFX Assets
+
+**Ready-made sprite sheet packs** (recommended for fastest results):
+
+- [itch.io](https://itch.io) — largest source of Godot-compatible VFX. Search "VFX sprite sheet", "fire particles", "2D effects"
+- [CraftPix](https://craftpix.net) / [GameDev Market](https://www.gamedevmarket.net) — commercial 2D VFX sprite sheets (fire, explosions, magic)
+- [OpenGameArt.org](https://opengameart.org/content/vfx) — free CC-licensed VFX sprite sheets
+- Unity Asset Store — many 2D VFX packs are just PNG sprite sheets usable in any engine (check license)
+
+A $10–20 sprite sheet pack typically includes fire, explosions, lightning, healing, and buff effects as ready-to-use assets. This gets 80% of the way to Hearthstone-quality VFX for minimal cost.
+
+**AI-generated VFX** (video-to-sprite-sheet pipeline):
+
+Generate a short fire/explosion clip with an open-source video model, extract frames, pack into a sprite sheet.
+
+| Model | VRAM | Notes |
+|-------|------|-------|
+| [Wan 2.2](https://github.com/Wan-Video/Wan2.2) (Alibaba) | 8 GB (1.3B) / 24 GB (5B) | Strongest open-source option. Text-to-video and image-to-video. [Apple Silicon port](https://github.com/osama-ata/Wan2.2-mlx) available. |
+| [CogVideoX](https://github.com/zai-org/CogVideo) | 8 GB (2B) / 12 GB (5B) | Lowest barrier to entry, runs on GTX 1080 Ti |
+| [HunyuanVideo](https://github.com/Tencent-Hunyuan/HunyuanVideo) (Tencent) | 14 GB (v1.5 w/ offload) | 13B params, high quality but heavier |
+| [LTX-Video](https://github.com/Lightricks/LTX-Video) | ~16 GB | Optimized for speed, 30fps faster than real-time |
+
+[Wan2GP](https://github.com/deepbeepmeep/Wan2GP) is a unified frontend supporting Wan 2.1/2.2, HunyuanVideo, and LTX-Video, optimized for consumer GPUs. [ComfyUI](https://github.com/comfyanonymous/ComfyUI) provides a node-based visual workflow wrapping all the above models.
+
+Extraction pipeline:
+
+```bash
+# 1. Generate clip: "fire bolt projectile on black background, side view, game VFX"
+# 2. Extract frames
+ffmpeg -i fireball.mp4 -vf "fps=12" frame_%03d.png
+# 3. Pack into sprite sheet with TexturePacker, Aseprite, or FreeTexturePacker
+# 4. Load into Godot AnimatedSprite2D or as GPUParticles2D texture
+```
+
+> [!note] For this project, AI video generation has significant cleanup overhead (transparent backgrounds, frame consistency). A purchased sprite sheet pack is more practical at this stage. The AI pipeline is better suited for card illustration (80+ unique images where per-image cost matters).
+
+**Direct AI sprite generation** (skips video entirely):
+
+- [AutoSprite](https://www.autosprite.io/ai-sprite-sheet-generator) — prompt to game-ready sprite sheet directly
+
 ## Dependencies on Other Systems
 
 ```mermaid
