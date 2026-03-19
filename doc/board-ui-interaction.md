@@ -223,7 +223,7 @@ BoardScene (Control)
 |-------|--------|------|---------|
 | `hero_panel.tscn` | `hero_panel.gd` | 200×80 | HP/Armor/Weapon display, click signal |
 | `board_minion.tscn` | `board_minion.gd` | 90×110 | Name, attack/health, keywords, taunt border, sickness overlay |
-| `hand_card.tscn` | `hand_card.gd` | 140×196 | Embeds `card_display.tscn` (full-rect, no scale), unplayable overlay, hover-to-enlarge |
+| `hand_card.tscn` | `hand_card.gd` | 100×140 | Own labels in VBoxContainer (mana, name, type, stats, text), highlight rect, unplayable overlay |
 | `face_down_card.tscn` | `face_down_card.gd` | 60×84 | Blue card back, no interactivity |
 
 Each sub-scene emits a click signal (`hero_clicked`, `minion_clicked`, `hand_card_clicked`) that the board scene's state machine handles.
@@ -252,7 +252,7 @@ New Godot scenes:
 | `godot/scenes/board/board_scene.tscn` | Main board layout — all areas composed |
 | `godot/scenes/board/hero_panel.tscn` | Hero HP/armor/weapon panel |
 | `godot/scenes/board/board_minion.tscn` | Board minion display |
-| `godot/scenes/board/hand_card.tscn` | Hand card (wraps card_display, full-rect fill) |
+| `godot/scenes/board/hand_card.tscn` | Hand card (own labels, no card_display dependency) |
 | `godot/scenes/board/face_down_card.tscn` | Opponent card back |
 
 New GDScript files:
@@ -299,11 +299,15 @@ This exercises minion play from turn 1, combat, taunt, targeted spells, and mana
 > [!note] CardRegistry sharing
 > `GameBridge` loads its own `CardRegistry` on `start_game()` (same path logic as `CardDatabase`). Simple, no coupling between the two autoloads.
 
-> [!note] Hand card mouse passthrough
-> The embedded `card_display.tscn` instance and its children (TextureRect, RichTextLabel) default to `mouse_filter = STOP`, which consumes click events before the parent `HandCard` sees them. Fix: set `mouse_filter = IGNORE` on the CardDisplay node in the tscn, and recursively disable mouse on all its descendants in `hand_card.gd:_ready()`.
-
-> [!note] Hand card scaling vs. fill
-> Applying `scale = Vector2(0.7, 0.7)` to CardDisplay inside a PanelContainer (which already resizes the child via anchors) causes double-shrinking — the control is resized to 140×196 *then* scaled to 98×137, making text unreadable. The fix: use Full Rect anchors (no scale) so CardDisplay fills the 140×196 PanelContainer directly. Internal labels at y>196 (attack/health icons) clip, but those stats appear on `BoardMinion` instead.
+> [!note] Don't embed `card_display.tscn` in board sub-scenes
+> `card_display.tscn` was designed for the full-size card gallery (`card_test.tscn`). Embedding it inside board sub-scenes caused a chain of layout failures:
+>
+> 1. **Scale + anchors double-shrink**: `scale = 0.7` on CardDisplay inside a PanelContainer (which already resizes via anchors) shrank the control twice — to 98×137 instead of 140×196.
+> 2. **Container child sizing**: PanelContainer is a Container subclass that overrides children's anchor/offset positioning. CardDisplay's children use absolute pixel offsets designed for 200×280, which the container management disrupted.
+> 3. **Plain Control doesn't set size**: Switching HandCard to a plain Control and instantiating CardDisplay dynamically still failed — a non-Container parent doesn't force children to their minimum size, so CardDisplay's full-rect-anchored children (like CardFrame) rendered at zero size.
+> 4. **Mouse passthrough**: CardDisplay's children (TextureRect, RichTextLabel) have `mouse_filter = STOP` by default, consuming clicks before the parent HandCard receives them.
+>
+> **Resolution**: `hand_card.tscn` was rebuilt with its own VBoxContainer of Labels (matching the `board_minion.tscn` pattern), removing the `card_display.tscn` dependency entirely. The `card_display.tscn` scene remains available for the card gallery view (`card_test.tscn`) where it works correctly inside a simple HBoxContainer.
 
 > [!note] BBCode requires RichTextLabel, not Label
 > `BoardMinion`'s stats label uses BBCode (`[color=red]`) to show damaged health in red. A plain `Label` renders BBCode tags as literal text (e.g., `2 / [color=red]2[/color]`). The fix: use `RichTextLabel` with `bbcode_enabled = true` and `fit_content = true`. For centering, wrap text in `[center]...[/center]` tags since RichTextLabel doesn't have `horizontal_alignment`. Also set `mouse_filter = 2` and `scroll_active = false` to prevent the label from capturing input or showing scrollbars.
@@ -324,13 +328,13 @@ flowchart TB
     ANI["[[metaplan#4. Animations & VFX|Animations & VFX]]"]
     NET["[[metaplan#5. Networking|Networking]]"]
 
-    CDP -->|"CardDef, CardRegistry,<br>CardDisplay scene"| BUI
+    CDP -->|"CardDef, CardRegistry"| BUI
     GRE -->|"GameEngine, GameState,<br>Action, Event, GameError"| BUI
     BUI -->|"Event stream for<br>animation hooks"| ANI
     BUI -->|"GameBridge will route<br>through network layer"| NET
 ```
 
-- **Card Data Pipeline** provides `CardRegistry` (loaded by `GameBridge`) and `card_display.tscn` (embedded in `hand_card.tscn`)
+- **Card Data Pipeline** provides `CardRegistry` (loaded by `GameBridge`)
 - **Game Rules Engine** provides `GameEngine` and all its types — `GameBridge` wraps it as a GodotClass
 - **Animations** (System 4) will consume the event arrays returned by action methods to play visual effects
 - **Networking** (System 5) will replace `GameBridge`'s local engine with a network client that sends actions to an authoritative server
