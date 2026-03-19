@@ -12,6 +12,8 @@ var _state: InteractionState = InteractionState.IDLE
 var _selected_hand_index: int = -1
 var _selected_attacker_id: int = -1
 var _valid_targets: Array = []
+var _animating: bool = false
+var _anim_controller: AnimationController
 
 # --- Node references ---
 @onready var player_hand: HBoxContainer = $PlayerArea/PlayerHand
@@ -29,12 +31,14 @@ var _valid_targets: Array = []
 @onready var restart_button: Button = $GameOverPanel/VBox/RestartButton
 @onready var debug_panel: VBoxContainer = $DebugPanel
 @onready var debug_info: Label = $DebugPanel/DebugInfo
+@onready var animation_layer: CanvasLayer = $AnimationLayer
 
 
 func _ready() -> void:
 	game_over_panel.visible = false
 	end_turn_button.pressed.connect(_on_end_turn_pressed)
 	restart_button.pressed.connect(_on_restart_pressed)
+	_anim_controller = AnimationController.new(self, animation_layer)
 
 	await get_tree().process_frame
 	_start_new_game()
@@ -64,6 +68,15 @@ func _build_test_deck() -> Array[String]:
 	for i in range(6):
 		deck.append("basic_fireball")
 	return deck
+
+
+# --- Animation ---
+
+func _play_events(events: Array, pre_action_player: int) -> void:
+	_animating = true
+	end_turn_button.disabled = true
+	await _anim_controller.play_events(events, pre_action_player)
+	_animating = false
 
 
 # --- UI Refresh ---
@@ -253,6 +266,8 @@ func _set_entity_targetable(entity_id: int, value: bool) -> void:
 # --- Input Handlers ---
 
 func _on_hand_card_clicked(hand_index: int) -> void:
+	if _animating:
+		return
 	match _state:
 		InteractionState.IDLE:
 			# Check if the card at this index is playable
@@ -280,6 +295,8 @@ func _on_hand_card_clicked(hand_index: int) -> void:
 
 
 func _on_minion_clicked(entity_id: int) -> void:
+	if _animating:
+		return
 	match _state:
 		InteractionState.IDLE:
 			# Check if this is our minion that can attack
@@ -312,6 +329,8 @@ func _on_minion_clicked(entity_id: int) -> void:
 
 
 func _on_hero_clicked(entity_id: int) -> void:
+	if _animating:
+		return
 	match _state:
 		InteractionState.ATTACKER_SELECTED:
 			if _valid_targets.has(entity_id):
@@ -328,9 +347,14 @@ func _on_hero_clicked(entity_id: int) -> void:
 
 
 func _on_end_turn_pressed() -> void:
+	if _animating:
+		return
+	var pre_active = Game.get_active_player()
 	var result = Game.end_turn()
 	if result.get("ok", false):
+		var events = result.get("events", [])
 		_set_state(InteractionState.IDLE)
+		await _play_events(events, pre_active)
 		refresh_ui()
 	else:
 		_show_status(result.get("error", "Unknown error"))
@@ -343,11 +367,13 @@ func _on_restart_pressed() -> void:
 # --- Actions ---
 
 func _play_card_action(hand_index: int, target_id: int) -> void:
-	var active = Game.get_active_player()
-	var board_size = Game.get_board(active).size()
+	var pre_active = Game.get_active_player()
+	var board_size = Game.get_board(pre_active).size()
 	var result = Game.play_card(hand_index, board_size, target_id)
 	if result.get("ok", false):
+		var events = result.get("events", [])
 		_set_state(InteractionState.IDLE)
+		await _play_events(events, pre_active)
 		refresh_ui()
 	else:
 		_show_status(result.get("error", "Unknown error"))
@@ -355,9 +381,12 @@ func _play_card_action(hand_index: int, target_id: int) -> void:
 
 
 func _attack_action(attacker_id: int, defender_id: int) -> void:
+	var pre_active = Game.get_active_player()
 	var result = Game.attack(attacker_id, defender_id)
 	if result.get("ok", false):
+		var events = result.get("events", [])
 		_set_state(InteractionState.IDLE)
+		await _play_events(events, pre_active)
 		refresh_ui()
 	else:
 		_show_status(result.get("error", "Unknown error"))
@@ -377,6 +406,8 @@ func _show_status(msg: String) -> void:
 # --- Global Input ---
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _animating:
+		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
 		_set_state(InteractionState.IDLE)
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:

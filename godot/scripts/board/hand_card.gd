@@ -12,11 +12,13 @@ signal hand_card_clicked(hand_index: int)
 @onready var unplayable_overlay: ColorRect = $UnplayableOverlay
 
 var _hand_index: int = -1
+var _entity_id: int = -1
 var _playable: bool = false
 var _selected: bool = false
 
 
 func set_card_data(data: Dictionary) -> void:
+	_entity_id = data.get("entity_id", -1)
 	_hand_index = data.get("hand_index", -1)
 	_playable = data.get("playable", false)
 

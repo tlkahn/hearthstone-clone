@@ -181,5 +181,7 @@ offset_bottom = 50.0
 [node name="DebugInfo" type="Label" parent="DebugPanel"]
 text = "Debug"
 
+[node name="AnimationLayer" type="CanvasLayer" parent="."]
+
 [connection signal="hero_clicked" from="OpponentArea/OpponentTopRow/OpponentHero" to="." method="_on_hero_clicked"]
 [connection signal="hero_clicked" from="PlayerArea/PlayerBottomRow/PlayerHero" to="." method="_on_hero_clicked"]
