@@ -51,7 +51,10 @@ hearthstone-clone/
 │   └── assets/art/             # Placeholder frames and card art
 └── doc/
     ├── metaplan.md             # High-level plan — 7 major systems
-    └── card-data-pipeline.md   # System 1 implementation doc
+    ├── card-data-pipeline.md   # System 1 implementation doc
+    ├── game-rules-engine.md    # System 2 implementation doc
+    ├── board-ui-interaction.md # System 3 implementation doc
+    └── animations-vfx.md      # System 4 implementation doc
 ```
 
 ## Build & Test
@@ -71,7 +74,7 @@ Open `godot/project.godot` in Godot to run the game. Main scene: `scenes/board/b
 | 1 | Card Data Pipeline | **Done** | `crates/rules/src/card.rs`, `card_loader.rs`, `gdext-bridge/src/card_bridge.rs` |
 | 2 | Game Rules Engine | **Done** | `crates/rules/src/engine.rs`, `effect.rs`, `effect_exec.rs`, `game_state.rs`, `entity.rs` |
 | 3 | Board UI & Interaction | **Done** | `gdext-bridge/src/game_bridge.rs`, `godot/scenes/board/`, `godot/scripts/board/` |
-| 4 | Animations & VFX | Not started | `godot/scenes/vfx/`, `godot/scripts/vfx/` |
+| 4 | Animations & VFX | **Done** | `godot/scripts/board/animation_controller.gd`, `floating_text.gd`, `godot/scenes/board/floating_text.tscn` |
 | 5 | Networking | Not started | `crates/network/`, `crates/server/` |
 | 6 | Backend Services | Not started | `crates/server/` |
 | 7 | Menus & Meta-Game | Not started | `godot/scenes/menus/`, `godot/scripts/menus/` |

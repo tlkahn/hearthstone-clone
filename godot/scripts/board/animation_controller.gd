@@ -9,11 +9,17 @@ var _board: Control
 var _anim_layer: CanvasLayer
 var animation_speed: float = 1.0
 var skip_animations: bool = false
+var _spell_context: Dictionary = {}
+var _fireball_impact_target: int = -1
 
 
 func _init(board: Control, anim_layer: CanvasLayer) -> void:
 	_board = board
 	_anim_layer = anim_layer
+
+
+func set_spell_context(card_pos: Vector2, target_id: int, card_id: String) -> void:
+	_spell_context = {"card_pos": card_pos, "target_id": target_id, "card_id": card_id}
 
 
 # --- Main entry point ---
@@ -23,6 +29,8 @@ func play_events(events: Array, pre_action_player: int) -> void:
 		return
 	for event in events:
 		await _dispatch_event(event, pre_action_player)
+	_spell_context = {}
+	_fireball_impact_target = -1
 
 
 func _dispatch_event(event: Dictionary, pap: int) -> void:
@@ -134,11 +142,20 @@ func _anim_damage(event: Dictionary) -> void:
 
 	_spawn_text("-%d" % amount, Color.RED, _center_of(target))
 
-	var tw = _board.create_tween()
-	tw.tween_property(target, "modulate", Color(1.5, 0.5, 0.5), _dur(0.1))
-	tw.tween_property(target, "modulate", Color.WHITE, _dur(0.15))
-	tw.tween_interval(_dur(0.25))
-	await tw.finished
+	if _fireball_impact_target == event.get("target", -1):
+		_fireball_impact_target = -1
+		_create_explosion(_center_of(target))
+		var tw = _board.create_tween()
+		tw.tween_property(target, "modulate", Color(2.0, 0.4, 0.0), _dur(0.1))
+		tw.tween_property(target, "modulate", Color.WHITE, _dur(0.2))
+		tw.tween_interval(_dur(0.2))
+		await tw.finished
+	else:
+		var tw = _board.create_tween()
+		tw.tween_property(target, "modulate", Color(1.5, 0.5, 0.5), _dur(0.1))
+		tw.tween_property(target, "modulate", Color.WHITE, _dur(0.15))
+		tw.tween_interval(_dur(0.25))
+		await tw.finished
 
 
 func _anim_hero_damaged(event: Dictionary, pap: int) -> void:
@@ -282,16 +299,159 @@ func _anim_card_drawn(event: Dictionary, pap: int) -> void:
 
 
 func _anim_spell_cast() -> void:
-	var flash = ColorRect.new()
-	flash.color = Color(1, 1, 1, 0.3)
-	flash.size = _board.get_viewport_rect().size
-	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_anim_layer.add_child(flash)
+	var card_id = _spell_context.get("card_id", "")
+	if card_id == "basic_fireball":
+		var target_node = _find_node(_spell_context.get("target_id", -1))
+		if target_node:
+			await _anim_fireball_bolt(
+				_spell_context.get("card_pos", Vector2.ZERO),
+				_center_of(target_node)
+			)
+			_fireball_impact_target = _spell_context.get("target_id", -1)
+		_spell_context = {}
+	else:
+		_spell_context = {}
+		var flash = ColorRect.new()
+		flash.color = Color(1, 1, 1, 0.3)
+		flash.size = _board.get_viewport_rect().size
+		flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_anim_layer.add_child(flash)
+
+		var tw = _board.create_tween()
+		tw.tween_property(flash, "color:a", 0.0, _dur(0.3))
+		await tw.finished
+		flash.queue_free()
+
+
+func _anim_fireball_bolt(from_pos: Vector2, to_pos: Vector2) -> void:
+	var direction = (to_pos - from_pos).normalized()
+	var flight_dur = _dur(0.4)
+
+	# Bolt head — bright yellow-orange panel rotated toward target
+	var bolt = Panel.new()
+	bolt.size = Vector2(24, 12)
+	bolt.pivot_offset = Vector2(12, 6)
+	bolt.position = from_pos - bolt.pivot_offset
+	bolt.rotation = direction.angle()
+	bolt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bolt.z_index = 50
+	var bolt_style = StyleBoxFlat.new()
+	bolt_style.bg_color = Color(1.0, 0.7, 0.1)
+	bolt_style.set_corner_radius_all(4)
+	bolt.add_theme_stylebox_override("panel", bolt_style)
+	_anim_layer.add_child(bolt)
+
+	# Glow halo behind bolt
+	var glow = Panel.new()
+	glow.size = Vector2(36, 20)
+	glow.pivot_offset = Vector2(18, 10)
+	glow.position = from_pos - glow.pivot_offset
+	glow.rotation = direction.angle()
+	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	glow.modulate = Color(1, 1, 1, 0.5)
+	var glow_style = StyleBoxFlat.new()
+	glow_style.bg_color = Color(1.0, 0.4, 0.0)
+	glow_style.set_corner_radius_all(6)
+	glow.add_theme_stylebox_override("panel", glow_style)
+	_anim_layer.add_child(glow)
+
+	# Fly both to target
+	var tw = _board.create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(bolt, "position", to_pos - bolt.pivot_offset, flight_dur)
+	tw.tween_property(glow, "position", to_pos - glow.pivot_offset, flight_dur)
+
+	# Spawn fire trail during flight
+	var trail_tw = _board.create_tween()
+	var steps = 8
+	for i in range(steps):
+		var t = float(i) / steps
+		var particle_pos = from_pos.lerp(to_pos, t)
+		trail_tw.tween_interval(flight_dur / steps)
+		trail_tw.tween_callback(_spawn_fire_particle.bind(particle_pos))
+
+	await tw.finished
+	bolt.queue_free()
+	glow.queue_free()
+
+
+func _spawn_fire_particle(pos: Vector2) -> void:
+	var particle = ColorRect.new()
+	var psize = randf_range(6, 12)
+	particle.size = Vector2(psize, psize)
+	particle.color = Color(1.0, randf_range(0.2, 0.5), 0.0, 0.8)
+	particle.position = pos - particle.size * 0.5 + Vector2(randf_range(-6, 6), randf_range(-6, 6))
+	particle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_anim_layer.add_child(particle)
 
 	var tw = _board.create_tween()
-	tw.tween_property(flash, "color:a", 0.0, _dur(0.3))
-	await tw.finished
-	flash.queue_free()
+	tw.set_parallel(true)
+	tw.tween_property(particle, "modulate:a", 0.0, 0.3)
+	tw.tween_property(particle, "scale", Vector2(0.3, 0.3), 0.3)
+	tw.set_parallel(false)
+	tw.tween_callback(particle.queue_free)
+
+
+func _create_explosion(pos: Vector2) -> void:
+	# Outer ring — expanding orange circle
+	var outer = Panel.new()
+	outer.size = Vector2(80, 80)
+	outer.pivot_offset = Vector2(40, 40)
+	outer.position = pos - Vector2(40, 40)
+	outer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var outer_style = StyleBoxFlat.new()
+	outer_style.bg_color = Color(1.0, 0.4, 0.0, 0.6)
+	outer_style.set_corner_radius_all(40)
+	outer.add_theme_stylebox_override("panel", outer_style)
+	_anim_layer.add_child(outer)
+	outer.scale = Vector2(0.3, 0.3)
+
+	var tw1 = _board.create_tween()
+	tw1.set_parallel(true)
+	tw1.tween_property(outer, "scale", Vector2(2.0, 2.0), 0.35)
+	tw1.tween_property(outer, "modulate:a", 0.0, 0.35)
+	tw1.set_parallel(false)
+	tw1.tween_callback(outer.queue_free)
+
+	# Inner flash — bright yellow core
+	var inner = Panel.new()
+	inner.size = Vector2(40, 40)
+	inner.pivot_offset = Vector2(20, 20)
+	inner.position = pos - Vector2(20, 20)
+	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var inner_style = StyleBoxFlat.new()
+	inner_style.bg_color = Color(1.0, 0.9, 0.3, 0.9)
+	inner_style.set_corner_radius_all(20)
+	inner.add_theme_stylebox_override("panel", inner_style)
+	_anim_layer.add_child(inner)
+	inner.scale = Vector2(0.5, 0.5)
+
+	var tw2 = _board.create_tween()
+	tw2.set_parallel(true)
+	tw2.tween_property(inner, "scale", Vector2(1.5, 1.5), 0.2)
+	tw2.tween_property(inner, "modulate:a", 0.0, 0.2)
+	tw2.set_parallel(false)
+	tw2.tween_callback(inner.queue_free)
+
+	# Scatter ember particles outward
+	for i in range(8):
+		var angle = randf() * TAU
+		var ember = ColorRect.new()
+		var esize = randf_range(4, 8)
+		ember.size = Vector2(esize, esize)
+		ember.color = Color(1.0, randf_range(0.3, 0.6), 0.0, 0.9)
+		ember.position = pos - ember.size * 0.5
+		ember.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_anim_layer.add_child(ember)
+
+		var dist = randf_range(30, 70)
+		var ember_target = pos + Vector2(cos(angle), sin(angle)) * dist - ember.size * 0.5
+		var tw3 = _board.create_tween()
+		tw3.set_parallel(true)
+		tw3.tween_property(ember, "position", ember_target, 0.3)
+		tw3.tween_property(ember, "modulate:a", 0.0, 0.3)
+		tw3.set_parallel(false)
+		tw3.tween_callback(ember.queue_free)
 
 
 func _anim_card_burned(event: Dictionary, pap: int) -> void:

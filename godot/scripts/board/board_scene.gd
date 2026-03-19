@@ -369,6 +369,20 @@ func _on_restart_pressed() -> void:
 func _play_card_action(hand_index: int, target_id: int) -> void:
 	var pre_active = Game.get_active_player()
 	var board_size = Game.get_board(pre_active).size()
+
+	# Save spell context for projectile animation (before engine call)
+	if target_id >= 0:
+		var hand = Game.get_hand(pre_active)
+		if hand_index < hand.size() and hand[hand_index].get("card_type", "") == "spell":
+			var card_children = player_hand.get_children()
+			if hand_index < card_children.size():
+				var card_node = card_children[hand_index]
+				_anim_controller.set_spell_context(
+					card_node.global_position + card_node.size * 0.5,
+					target_id,
+					hand[hand_index].get("card_id", "")
+				)
+
 	var result = Game.play_card(hand_index, board_size, target_id)
 	if result.get("ok", false):
 		var events = result.get("events", [])
