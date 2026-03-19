@@ -364,7 +364,7 @@ impl GameEngine {
         }
     }
 
-    pub(crate) fn hero_entity_id(player: PlayerId) -> EntityId {
+    pub fn hero_entity_id(player: PlayerId) -> EntityId {
         // Use sentinel values: 0 for player 0's hero, u64::MAX for player 1's hero
         if player == 0 {
             0
