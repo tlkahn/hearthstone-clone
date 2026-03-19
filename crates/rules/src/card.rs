@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::effect::Effect;
+
 pub type CardId = String;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -19,9 +21,6 @@ pub enum Keyword {
     Charge,
     DivineShield,
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct EffectTag(pub String);
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MinionStats {
@@ -53,7 +52,7 @@ pub struct CardDef {
     pub text: String,
     pub art: String,
     #[serde(default)]
-    pub effects: Vec<EffectTag>,
+    pub effects: Vec<Effect>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,7 +106,7 @@ mod tests {
                 keywords: [],
                 text: "Deal 6 damage.",
                 art: "fireball.png",
-                effects: [EffectTag("deal_damage_6")],
+                effects: [DealDamage(amount: 6, target: PlayerChoice(EnemyCharacter))],
             )
         "#;
         let card: super::CardDef = ron::from_str(ron_str).unwrap();
@@ -115,7 +114,10 @@ mod tests {
         assert_eq!(card.text, "Deal 6 damage.");
         assert!(matches!(card.card_type, super::CardTypeData::Spell));
         assert_eq!(card.effects.len(), 1);
-        assert_eq!(card.effects[0].0, "deal_damage_6");
+        assert!(matches!(
+            card.effects[0],
+            crate::effect::Effect::DealDamage { amount: 6, .. }
+        ));
     }
 
     #[test]
@@ -174,7 +176,7 @@ mod tests {
                 keywords: [Charge, Battlecry],
                 text: "Charge. Battlecry: Summon two 1/1 Whelps for your opponent.",
                 art: "leeroy.png",
-                effects: [EffectTag("summon_whelps_for_opponent")],
+                effects: [Summon(card_id: "token_whelp", count: 2, for_opponent: true)],
             )
         "#;
         let card: super::CardDef = ron::from_str(ron_str).unwrap();

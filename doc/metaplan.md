@@ -53,6 +53,7 @@ This split plays to each language's strength — Godot for presentation, Rust fo
 
 - Card play, attack, damage, death, spell cast
 - Tweens, particle effects, screen shake
+
 ### 5. Networking
 
 - Client-server protocol (WebSocket or TCP)
@@ -68,6 +69,7 @@ This split plays to each language's strength — Godot for presentation, Rust fo
 
 - Collection viewer, deck builder, matchmaking lobby
 - Heavily UI — Godot's Control nodes shine here
+
 ---
 
 ## Asset Budget (Minimum Viable)

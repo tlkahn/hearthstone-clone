@@ -21,10 +21,19 @@ A Hearthstone-like 2D card game built with **Godot 4.6 + gdext (Rust)**.
 hearthstone-clone/
 ├── Cargo.toml                  # Workspace: crates/rules, crates/gdext-bridge
 ├── crates/
-│   ├── rules/                  # hs-rules crate — card types, loader, registry
+│   ├── rules/                  # hs-rules crate — card types, loader, game engine
 │   │   └── src/
-│   │       ├── card.rs         # CardDef, CardSet, CardTypeData, Keyword, Rarity, EffectTag
+│   │       ├── card.rs         # CardDef, CardSet, CardTypeData, Keyword, Rarity
 │   │       ├── card_loader.rs  # CardRegistry, load_from_directory, validation
+│   │       ├── types.rs        # EntityId, PlayerId, constants
+│   │       ├── entity.rs       # Entity (runtime card instance), MinionEntity, WeaponEntity
+│   │       ├── game_state.rs   # GameState, Player, Hero
+│   │       ├── action.rs       # Action enum (EndTurn, PlayCard, Attack)
+│   │       ├── event.rs        # Event enum (CardDrawn, DamageDealt, MinionDied, etc.)
+│   │       ├── error.rs        # GameError enum
+│   │       ├── engine.rs       # GameEngine — central orchestrator
+│   │       ├── effect.rs       # Effect enum, TargetSpec, TargetFilter
+│   │       ├── effect_exec.rs  # Effect execution, targeting, deathrattle processing
 │   │       └── lib.rs
 │   └── gdext-bridge/           # hs-gdext-bridge crate — GodotClasses
 │       └── src/
@@ -46,7 +55,7 @@ hearthstone-clone/
 
 ```bash
 cargo build                     # Build all crates
-cargo test -p hs-rules          # Run 17 unit/integration tests
+cargo test -p hs-rules          # Run 76 unit/integration tests
 cargo build -p hs-gdext-bridge  # Build the Godot extension dylib
 ```
 
@@ -57,7 +66,7 @@ Open `godot/project.godot` in Godot to run the game. Main test scene: `scenes/ca
 | # | System | Status | Key files |
 |---|--------|--------|-----------|
 | 1 | Card Data Pipeline | **Done** | `crates/rules/src/card.rs`, `card_loader.rs`, `gdext-bridge/src/card_bridge.rs` |
-| 2 | Game Rules Engine | Not started | `crates/rules/` (will extend) |
+| 2 | Game Rules Engine | **Done** | `crates/rules/src/engine.rs`, `effect.rs`, `effect_exec.rs`, `game_state.rs`, `entity.rs` |
 | 3 | Board UI & Interaction | Not started | `godot/scenes/board/`, `godot/scripts/board/` |
 | 4 | Animations & VFX | Not started | `godot/scenes/vfx/`, `godot/scripts/vfx/` |
 | 5 | Networking | Not started | `crates/network/`, `crates/server/` |
@@ -72,12 +81,13 @@ Open `godot/project.godot` in Godot to run the game. Main test scene: `scenes/ca
 - **GDScript type inference** — use `var x = CardDB.method()` (not `:=`) for gdext return values since types can't be inferred across FFI
 - **Hot-reload** — press F5 in-game to reload card data from disk without restarting
 - **Docs in Obsidian Markdown** — system docs live in `doc/` using wikilinks, callouts, Mermaid diagrams
-- **Deps:** `serde` + `ron 0.8` + `thiserror 2` for rules; `godot 0.4` for bridge
+- **Deps:** `serde` + `ron 0.8` + `thiserror 2` + `rand 0.8` for rules; `godot 0.4` for bridge
 
 ## Key Design Decisions
 
 - **RON over JSON** for card definitions (enum support, comments, trailing commas)
 - **`CardTypeData` tagged enum** enforces that minions have attack/health, weapons have attack/durability, spells have neither — compiler-checked
-- **`EffectTag(String)`** is an opaque placeholder for future effect system hookup
+- **`Effect` enum** with 6 types (DealDamage, Heal, Summon, DrawCards, BuffMinion, DestroyMinion) and targeting system (TargetSpec + TargetFilter)
+- **Action/Event sourcing** — actions are player intents, events are atomic state mutations; enables networking, animation, replay
 - **`crates/rules` is pure Rust** with zero Godot dependency — testable independently, reusable by server
 - **CardDB autoload** — globally accessible in GDScript via `CardDB.get_card(id)`

@@ -11,7 +11,7 @@ CardSet(
             keywords: [],
             text: "Deal 6 damage.",
             art: "fireball.png",
-            effects: [EffectTag("deal_damage_6")],
+            effects: [DealDamage(amount: 6, target: PlayerChoice(EnemyCharacter))],
         ),
     ],
 )

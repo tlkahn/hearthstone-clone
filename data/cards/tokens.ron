@@ -1,0 +1,16 @@
+// Token cards — summoned by effects, not collectible
+CardSet(
+    name: "Tokens",
+    cards: [
+        CardDef(
+            id: "token_whelp",
+            name: "Whelp",
+            mana_cost: 1,
+            card_type: Minion(MinionStats(attack: 1, health: 1)),
+            rarity: Free,
+            keywords: [],
+            text: "",
+            art: "whelp.png",
+        ),
+    ],
+)

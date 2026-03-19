@@ -31,7 +31,7 @@ CardSet(
             keywords: [Charge, Battlecry],
             text: "Charge. Battlecry: Summon two 1/1 Whelps for your opponent.",
             art: "leeroy_jenkins.png",
-            effects: [EffectTag("summon_whelps_for_opponent")],
+            effects: [Summon(card_id: "token_whelp", count: 2, for_opponent: true)],
         ),
     ],
 )
