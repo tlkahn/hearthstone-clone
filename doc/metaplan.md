@@ -56,9 +56,13 @@ This split plays to each language's strength — Godot for presentation, Rust fo
 
 ### 5. Networking
 
-- Client-server protocol (WebSocket or TCP)
-- Authoritative server (Rust standalone, reusing the rules engine crate)
-- State sync, reconnection
+- **Hybrid P2P model** — Gods Unchained-inspired: P2P gameplay off-chain, assets and results on-chain (EVM L2)
+- Mental poker protocol for hidden information (deck shuffle, card draw) without a trusted server
+- Signed action exchange — both peers run `hs-rules`, verify state hashes each turn
+- On-chain: card NFTs (ERC-1155), match results, MMR/ranking, dispute resolution
+- Off-chain: gameplay, mental poker shuffle, state sync
+- Lightweight signaling server for WebRTC peer discovery (stateless, no game logic)
+- See [[networking-p2p]] for full architecture doc
 
 ### 6. Backend Services
 
