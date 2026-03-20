@@ -250,6 +250,123 @@ Sprite2D + shader (heat distortion on background)
 
 Each particle system needs a hand-painted or photographed fire texture, not a solid-color rectangle. That's where the visual quality comes from.
 
+### Game Sounds & Audio Cues
+
+Hearthstone uses layered audio feedback to reinforce every game event — attacks land with meaty impacts, battlecries are voiced lines, deathrattles have eerie tolls, and even card draws have a satisfying "whoosh." Without sound, the best animations feel hollow.
+
+#### Sound Categories
+
+| Category | Trigger Event | Hearthstone Reference | Implementation |
+|----------|---------------|----------------------|----------------|
+| **Attack impact** | `attack_performed` | Melee slash, weapon clang, or fist thud depending on attacker type | Play at lunge apex (same callback that spawns slash VFX) |
+| **Battlecry** | `minion_summoned` (if minion has battlecry) | Voiced line unique to the card ("Charge forward!", "Heh, this guy's toast") | Play after summon bounce animation |
+| **Deathrattle** | `minion_died` (if minion has deathrattle) | Bell toll + eerie whisper + card-specific line | Play at start of death fade animation |
+| **Spell cast** | `spell_cast` | Arcane whoosh, fire ignition, frost crackle — varies by spell school | Play during spell flash/projectile animation |
+| **Card draw** | `card_drawn` | Quick paper slide / whoosh | Play as card scales in |
+| **Card play** | `card_played` | Heavier card slam onto the board | Play as hand card shrinks |
+| **Minion summon** | `minion_summoned` | Magical materialization sound (sparkle/thud) | Play during scale-up bounce |
+| **Minion death** | `minion_died` | Generic death groan or shatter | Play during fade-out |
+| **Hero damage** | `hero_damaged` | Armor clank or pain grunt | Play with shake animation |
+| **Hero death** | `hero_died` | Dramatic explosion + defeat sting | Play with red flash |
+| **Turn start** | `turn_started` | Coin spin / bell chime + "Your turn" voice line | Play with banner slide-in |
+| **Divine shield pop** | `divine_shield_popped` | Glass shatter | Play with yellow flash |
+| **Taunt** | Visual only (shield border) | Low shield-raise sound on summon | Play if summoned minion has taunt |
+| **Fatigue** | `fatigue_damage` | Ominous rumble + pain | Play with hero shake |
+| **Card burn** | `card_burned` | Fire crackle + paper ignition | Play with "Burned!" text |
+| **Weapon equip** | `weapon_equipped` | Metallic unsheathe / anvil ring | Play with hero flash |
+
+#### Godot's Audio Toolbox
+
+| Node / Class | Use Case |
+|-------------|----------|
+| `AudioStreamPlayer` | Non-positional audio — UI sounds, music, turn announcements (same volume regardless of screen position) |
+| `AudioStreamPlayer2D` | Positional audio — attack impacts, death sounds, spell hits (panned/attenuated by distance from listener) |
+| `AudioBus` | Mixing — separate buses for SFX, Music, Voice, UI with independent volume sliders |
+| `AudioStream` formats | `.ogg` (OGG Vorbis) for music/loops, `.wav` for short SFX (no decoding latency), `.mp3` supported but `.ogg` preferred in Godot |
+| `AudioStreamRandomizer` | Variation — wraps multiple similar clips, randomizes pitch/selection to avoid repetition fatigue |
+| `AudioStreamPolyphonic` | Layering — play multiple simultaneous sounds from one player (e.g., impact + grunt + shield break all at once) |
+
+> [!tip] For a card game with a fixed camera, `AudioStreamPlayer` (non-positional) is usually sufficient. Use `AudioStreamPlayer2D` only if you want subtle left-right panning based on board position (e.g., attack on the left side of the board sounds slightly panned left).
+
+#### Implementation Pattern
+
+Sound playback follows the same fire-and-forget pattern as VFX sprites. Add an `_play_sound()` helper to `AnimationController`:
+
+```gdscript
+# Preload sound assets
+const SFX_ATTACK_SLASH = preload("res://assets/sfx/attack_slash.ogg")
+const SFX_CARD_DRAW = preload("res://assets/sfx/card_draw.ogg")
+const SFX_MINION_DEATH = preload("res://assets/sfx/minion_death.ogg")
+# ... etc
+
+func _play_sound(stream: AudioStream, volume_db: float = 0.0, pitch_variance: float = 0.05) -> void:
+    var player = AudioStreamPlayer.new()
+    player.stream = stream
+    player.volume_db = volume_db
+    player.pitch_scale = randf_range(1.0 - pitch_variance, 1.0 + pitch_variance)
+    _anim_layer.add_child(player)
+    player.play()
+    player.finished.connect(player.queue_free)
+```
+
+Then call it from existing animation handlers:
+
+```gdscript
+func _anim_attack(event: Dictionary) -> void:
+    # ... existing lunge code ...
+    tw.tween_callback(_play_sound.bind(SFX_ATTACK_SLASH))
+    tw.tween_callback(_create_slash_effect.bind(_center_of(defender), direction.angle()))
+    # ... existing return code ...
+```
+
+> [!note] The `pitch_variance` parameter applies slight random pitch shifting (±5% by default) so repeated attacks don't sound identical. This is a standard game audio technique called "pitch randomization."
+
+#### Per-Card Voice Lines
+
+In Hearthstone, each minion has unique voice lines for summon, attack, and death. To support this in the card data pipeline:
+
+1. **Add sound fields to `CardDef`** (in `card.rs`):
+
+```rust
+pub struct CardDef {
+    // ... existing fields ...
+    pub sfx_summon: Option<String>,    // "res://assets/sfx/cards/fire_elemental_summon.ogg"
+    pub sfx_attack: Option<String>,
+    pub sfx_death: Option<String>,
+}
+```
+
+2. **Reference in RON card data**:
+
+```ron
+CardDef(
+    id: "basic_fire_elemental",
+    name: "Fire Elemental",
+    // ... existing fields ...
+    sfx_summon: Some("cards/fire_elemental_summon"),
+    sfx_attack: Some("cards/fire_elemental_attack"),
+    sfx_death: Some("cards/fire_elemental_death"),
+)
+```
+
+3. **Look up via CardDB at animation time** — the animation handler fetches the card's sound path from `CardDB.get_card(card_id)` and loads it dynamically, falling back to a generic sound if no card-specific clip exists.
+
+> [!warning] Voice lines are the most expensive audio asset category — a set of 100 cards with 3 lines each (summon, attack, death) requires 300 recorded clips. For early development, use a single generic sound per event type and add per-card voices incrementally for key cards.
+
+#### Sourcing Sound Assets
+
+| Source | Type | Notes |
+|--------|------|-------|
+| [Freesound.org](https://freesound.org) | Free (CC) | Huge library of individual SFX — search "sword slash", "magic spell", "card flip" |
+| [Sonniss GDC Bundle](https://sonniss.com/gameaudiogdc) | Free | Annual free pack of professional game SFX (thousands of clips) |
+| [Kenney.nl](https://kenney.nl/assets?q=audio) | Free (CC0) | Clean, game-ready UI and impact sounds |
+| [GameSounds.xyz](https://gamesounds.xyz) | Free (CC0) | Royalty-free game audio library |
+| [Epidemic Sound](https://www.epidemicsound.com) | Subscription | Professional music and SFX, game-licensed |
+| [PMSFX](https://www.pmsfx.com) | Free/Paid | Cinematic game SFX — magic, impacts, UI |
+| **AI generation** | Free | [ElevenLabs](https://elevenlabs.io) or [Bark](https://github.com/suno-ai/bark) for voice lines; [Stable Audio](https://www.stableaudio.com) for SFX |
+
+> [!tip] Start with Kenney's free UI audio pack for card draw/play sounds and Freesound for combat impacts. These get functional audio running in minutes. Replace with higher-quality assets later.
+
 ### Sourcing VFX Assets
 
 **Ready-made sprite sheet packs** (recommended for fastest results):

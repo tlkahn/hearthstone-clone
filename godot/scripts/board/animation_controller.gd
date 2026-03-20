@@ -6,6 +6,9 @@ const HandCardScene = preload("res://scenes/board/hand_card.tscn")
 const FaceDownCardScene = preload("res://scenes/board/face_down_card.tscn")
 const ExplosionTexture = preload("res://assets/vfx/explosion_spritesheet.png")
 const SlashTexture = preload("res://assets/vfx/slash_spritesheet.png")
+const SfxSwordFight = preload("res://assets/sfx/sword_fight.wav")
+const SfxFirespellLaunch = preload("res://assets/sfx/firespell_launch.wav")
+const SfxExplosion = preload("res://assets/sfx/explosion.wav")
 
 var _board: Control
 var _anim_layer: CanvasLayer
@@ -110,6 +113,15 @@ func _center_of(node: Control) -> Vector2:
 	return node.global_position + node.size * 0.5
 
 
+func _play_sound(stream: AudioStream, volume_db: float = 0.0) -> void:
+	var player = AudioStreamPlayer.new()
+	player.stream = stream
+	player.volume_db = volume_db
+	_anim_layer.add_child(player)
+	player.play()
+	player.finished.connect(player.queue_free)
+
+
 func _spawn_text(text: String, color: Color, target_pos: Vector2) -> void:
 	var ft = FloatingTextScene.instantiate()
 	_anim_layer.add_child(ft)
@@ -132,6 +144,7 @@ func _anim_attack(event: Dictionary) -> void:
 	attacker.z_index = 20
 	var tw = _board.create_tween()
 	tw.tween_property(attacker, "position", start + delta, _dur(0.2))
+	tw.tween_callback(_play_sound.bind(SfxSwordFight))
 	tw.tween_callback(_create_slash_effect.bind(_center_of(defender), direction.angle()))
 	tw.tween_property(attacker, "position", start, _dur(0.2))
 	await tw.finished
@@ -146,8 +159,9 @@ func _anim_damage(event: Dictionary) -> void:
 
 	_spawn_text("-%d" % amount, Color.RED, _center_of(target))
 
-	if _fireball_impact_target == event.get("target", -1):
+	if _fireball_impact_target == event.get("target", -1) and not event.has("source"):
 		_fireball_impact_target = -1
+		_play_sound(SfxExplosion)
 		_create_explosion(_center_of(target))
 		var tw = _board.create_tween()
 		tw.tween_property(target, "modulate", Color(2.0, 0.4, 0.0), _dur(0.1))
@@ -328,6 +342,7 @@ func _anim_spell_cast() -> void:
 
 
 func _anim_fireball_bolt(from_pos: Vector2, to_pos: Vector2) -> void:
+	_play_sound(SfxFirespellLaunch)
 	var direction = (to_pos - from_pos).normalized()
 	var flight_dur = _dur(0.4)
 
