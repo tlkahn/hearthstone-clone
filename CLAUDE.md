@@ -97,3 +97,4 @@ Open `godot/project.godot` in Godot to run the game. Main scene: `scenes/board/b
 - **Action/Event sourcing** — actions are player intents, events are atomic state mutations; enables networking, animation, replay
 - **`crates/rules` is pure Rust** with zero Godot dependency — testable independently, reusable by server
 - **CardDB autoload** — globally accessible in GDScript via `CardDB.get_card(id)`
+- **Hero entity_id sentinels** — Player 0 hero = `0`, Player 1 hero = `u64::MAX` (wraps to `-1` as i64 across FFI). GDScript/bridge uses `NO_TARGET = -2` to distinguish "no target" from Player 1's hero. Never use `-1` or `< 0` checks to mean "no target".

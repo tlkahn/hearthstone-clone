@@ -2832,4 +2832,75 @@ mod tests {
         let events = engine.execute_effects(&effects, 0, None, 20);
         assert!(events.is_empty());
     }
+
+    // --- Hero entity_id sentinel tests ---
+
+    #[test]
+    fn hero_sentinel_values() {
+        assert_eq!(GameEngine::hero_entity_id(0), 0);
+        assert_eq!(GameEngine::hero_entity_id(1), u64::MAX);
+    }
+
+    #[test]
+    fn hero_sentinels_no_collision_with_allocated_ids() {
+        // Normal entity_ids start at 1 and increment; they must never
+        // collide with the hero sentinels (0 and u64::MAX).
+        let reg = test_registry();
+        let deck = make_deck("test_minion_2_3", 30);
+        let (engine, _) = GameEngine::new_game(reg, &deck, &deck, fixed_rng());
+
+        let next = engine.state().next_entity_id;
+        assert!(next >= 1, "allocated ids start at 1");
+        // All allocated ids are in [1, next), none equal to sentinels
+        for id in 1..next {
+            assert_ne!(id, GameEngine::hero_entity_id(0));
+            assert_ne!(id, GameEngine::hero_entity_id(1));
+        }
+    }
+
+    #[test]
+    fn hero_p1_sentinel_wraps_to_negative_i64() {
+        // The gdext bridge converts EntityId (u64) to i64 for GDScript.
+        // Player 1's hero sentinel u64::MAX becomes -1 as i64.
+        // This test documents that invariant so bridge code (NO_TARGET = -2)
+        // stays correct.
+        let p1_hero = GameEngine::hero_entity_id(1);
+        let as_i64 = p1_hero as i64;
+        assert_eq!(as_i64, -1, "u64::MAX must wrap to -1 as i64");
+
+        // Roundtrip: i64 → u64 must recover the original sentinel
+        let roundtrip = as_i64 as u64;
+        assert_eq!(roundtrip, p1_hero);
+
+        // The bridge NO_TARGET sentinel (-2) must NOT collide with either hero
+        const NO_TARGET: i64 = -2;
+        let p0_hero_i64 = GameEngine::hero_entity_id(0) as i64;
+        assert_ne!(NO_TARGET, p0_hero_i64);
+        assert_ne!(NO_TARGET, as_i64);
+    }
+
+    #[test]
+    fn fireball_p1_hero_via_i64_roundtrip() {
+        // Simulate the bridge conversion path: hero_entity_id → i64 → u64 → target
+        let reg = test_registry();
+        let deck_p0 = make_deck("test_fireball", 30);
+        let deck_p1 = make_deck("test_minion_2_3", 30);
+        let (mut engine, _) = GameEngine::new_game(reg, &deck_p0, &deck_p1, fixed_rng());
+        engine.state.players[0].mana = 10;
+
+        // Convert through i64 as the bridge does
+        let hero_u64 = GameEngine::hero_entity_id(1);
+        let hero_i64 = hero_u64 as i64; // bridge: entity_id_to_i64
+        assert_eq!(hero_i64, -1);
+        let target = hero_i64 as EntityId; // bridge: i64_to_entity_id
+
+        engine.process_action(Action::PlayCard {
+            player: 0,
+            hand_index: 0,
+            position: 0,
+            target: Some(target),
+        }).unwrap();
+
+        assert_eq!(engine.state().players[1].hero.hp, STARTING_HP - 6);
+    }
 }

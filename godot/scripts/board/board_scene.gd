@@ -7,6 +7,7 @@ const BoardMinionScene = preload("res://scenes/board/board_minion.tscn")
 
 # --- Interaction state machine ---
 enum InteractionState { IDLE, CARD_SELECTED, ATTACKER_SELECTED, TARGETING_SPELL }
+const NO_TARGET: int = -2
 
 var _state: InteractionState = InteractionState.IDLE
 var _selected_hand_index: int = -1
@@ -283,12 +284,12 @@ func _on_hand_card_clicked(hand_index: int) -> void:
 					_valid_targets = Array(Game.get_valid_targets(hand_index))
 					if _valid_targets.is_empty():
 						# No valid targets — play without target
-						_play_card_action(hand_index, -1)
+						_play_card_action(hand_index, NO_TARGET)
 					else:
 						_set_state(InteractionState.TARGETING_SPELL)
 				else:
 					# Non-targeted card — play directly (minion or non-targeted spell)
-					_play_card_action(hand_index, -1)
+					_play_card_action(hand_index, NO_TARGET)
 		_:
 			# Clicking hand card from other states → cancel
 			_set_state(InteractionState.IDLE)
@@ -371,7 +372,7 @@ func _play_card_action(hand_index: int, target_id: int) -> void:
 	var board_size = Game.get_board(pre_active).size()
 
 	# Save spell context for projectile animation (before engine call)
-	if target_id >= 0:
+	if target_id != NO_TARGET:
 		var hand = Game.get_hand(pre_active)
 		if hand_index < hand.size() and hand[hand_index].get("card_type", "") == "spell":
 			var card_children = player_hand.get_children()

@@ -75,12 +75,24 @@ Effects (particularly deathrattles) can chain — a dying minion triggers a deat
 
 | Type | Definition | Purpose |
 |------|-----------|---------|
-| `EntityId` | `u64` | Unique identifier for each runtime card instance |
+| `EntityId` | `u64` | Unique identifier for each runtime card instance (see [[#Hero Entity ID Sentinels]]) |
 | `PlayerId` | `usize` (0 or 1) | Identifies which player |
 | `MAX_HAND_SIZE` | `10` | Cards beyond this are burned on draw |
 | `MAX_BOARD_SIZE` | `7` | Maximum minions per player |
 | `MAX_MANA` | `10` | Mana crystal cap |
 | `STARTING_HP` | `30` | Hero starting health |
+
+#### Hero Entity ID Sentinels
+
+Heroes are not allocated entity IDs from the normal sequential counter (`next_entity_id`). Instead they use fixed sentinel values defined in `effect_exec.rs::hero_entity_id()`:
+
+| Player | Sentinel (`u64`) | As `i64` (FFI) | Notes |
+|--------|-----------------|-----------------|-------|
+| Player 0 | `0` | `0` | Safe — normal IDs start at 1 |
+| Player 1 | `u64::MAX` | `-1` | Wraps via two's complement |
+
+> [!warning] FFI boundary: `-1` is a valid hero target
+> Because Player 1's hero sentinel becomes `-1` when cast to `i64`, the gdext bridge **cannot** use `-1` or `< 0` checks to mean "no target". The bridge uses `NO_TARGET = -2` as the sentinel for "no target" (set in both `game_bridge.rs::play_card()` and `board_scene.gd`). The conversion function `i64_to_entity_id()` correctly maps `-1` back to `u64::MAX`.
 
 #### Entity — `entity.rs`
 

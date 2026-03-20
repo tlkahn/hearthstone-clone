@@ -81,10 +81,11 @@ impl GameBridge {
         };
 
         let player = engine.state().active_player;
-        let target_opt = if target < 0 {
+        const NO_TARGET: i64 = -2;
+        let target_opt = if target == NO_TARGET {
             None
         } else {
-            Some(target as EntityId)
+            Some(i64_to_entity_id(target))
         };
 
         let action = Action::PlayCard {
