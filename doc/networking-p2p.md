@@ -74,7 +74,7 @@ sequenceDiagram
     A->>B: Commit hash of drawn card (for later verification)
 ```
 
-This will be implemented as a standalone Rust crate first: [[mental-poker-protocol]].
+    This will be implemented as a standalone Rust crate first: [[mental-poker-protocol]].
 
 ---
 
